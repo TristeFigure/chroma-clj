@@ -10,9 +10,7 @@ This project provides a Clojure interface to the [ChromaDB](https://docs.trychro
    - `pip install chromadb`
 4. Add this dependency to your project: `[chroma-clj "0.1.0"]`
 
-## API Doc
-
-TODO
+## [API Doc](https://tristefigure.github.io/chroma-clj/index.html)
 
 ## Usage
 
