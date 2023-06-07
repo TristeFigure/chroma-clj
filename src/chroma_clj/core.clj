@@ -26,11 +26,15 @@
       exp))
   )
 
-(initialize!)
 
-(def ^:private chroma-db (import-module "chromadb"))
-(from-import "chromadb"  ^:private Client)
-(from-import "chromadb.config" ^:private Settings)
+(if (find-ns 'codox.main)
+  (do (def chroma-db nil)
+      (def Client nil)
+      (def Settings nil))
+  (do (initialize!)
+      (def ^:private chroma-db (import-module "chromadb"))
+      (from-import "chromadb"  ^:private Client)
+      (from-import "chromadb.config" ^:private Settings)))
 
 (defn client
   "Creates a new ChromaDB client instance.
@@ -267,6 +271,3 @@
   ([m]    (chroma-map (gensym "chroma-map-") m))
   ([id m] (-> (ChromaMap. id (create-collection (str (gensym))) {} {})
               (merge m))))
-
-(def my-client (client {:chroma-db-impl    "duckdb+parquet"
-                        :persist-directory "/path/to/directory"}))
