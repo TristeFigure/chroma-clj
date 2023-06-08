@@ -109,10 +109,6 @@ Once you have a collection, in the same manner, relying on the collection in the
 
 As a reminder, the `with-client` and `on-collection` macros bind their argument to the `*client*` and `*collection*` dynamic vars, respectively. This allows you to omit the client or collection argument in calls to the functions in their body.
 
-Sure, here's a more succinct version:
-
----
-
 ## Fuzzy datastructures
 
 ### Hashmap
