@@ -1,6 +1,6 @@
 # ChromaDB Clojure Bindings
 
-This project provides a Clojure interface to the [ChromaDB](https://docs.trychroma.com/) document database using [libpython-clj](https://github.com/clj-python/libpython-clj). 
+This project provides a Clojure interface to the [ChromaDB](https://docs.trychroma.com/) document database using [libpython-clj](https://github.com/clj-python/libpython-clj) as well as fuzzy map and set implementations relying on embeddings proximity.
 
 ## Setup
 
@@ -28,14 +28,25 @@ First, initialize the library and create a new ChromaDB client:
 You can create a ChromaDB client with the `client` function:
 
 ```clojure
-(def my-client (client {:chroma-db-impl    "duckdb+parquet"
-                        :persist-directory "/path/to/directory"}))
+(def my-client (chroma/client {:chroma-db-impl    "duckdb+parquet"
+                               :persist-directory "/path/to/directory"}))
+```
+
+or use
+
+```clojure
+(chroma/set-client! (chroma/client))
 ```
 
 This client can then be used to create a collection:
 
 ```clojure
-(create-collection my-client "my-collection")
+(chroma/create-collection my-client "my-collection")
+;; or
+(chroma/with-client my-client
+  (chroma/create-collection "my-collection"))
+;; or after (chroma/set-client! (chroma/client))
+(chroma/create-collection "my-collection")
 ```
 
 ## Client Methods
@@ -44,7 +55,7 @@ You can interact with ChromaDB at a high level using the following functions. Ea
 
 ```clojure
 (with-client my-client
-  (list-collections)
+  (list-collections) ;; or (list-collections my-client) and so on ...
   (create-collection "testname")
   (get-collection "testname")
   (get-or-create-collection "testname")
@@ -93,10 +104,13 @@ Sure, here's a more succinct version:
 
 ---
 
-## A HashMap Implementation with Fuzzy Key Interpretation
+## Fuzzy datastructures
+
+### Hashmap
 
 ```clojure
-(let [my-map (chroma-map {:key1 "value1" :key2 "value2" :key3 "value3"})] ...)
+(let [my-map (chroma-map {:key1 "value1" :key2 "value2" :key3 "value3"})]
+  ...)
 ```
 
 Notable behaviors:
@@ -104,6 +118,35 @@ Notable behaviors:
 - `assoc` adds key-value pairs to the map and creates corresponding documents in ChromaDB.
 - `dissoc` removes key-value pairs from the map and deletes corresponding documents in ChromaDB.
 - `get` queries ChromaDB for the most similar key before retrieving values from the map.
+
+### Set
+
+```clojure
+(let [my-set (chroma-set #{"value1" "value2" "value3"})]
+  ...)
+```
+
+Notable behaviors:
+
+- `conj` adds values to the set and creates corresponding documents in ChromaDB.
+- `disj` removes values from the set and deletes corresponding documents in ChromaDB.
+- `get` queries ChromaDB for the most similar value and returns the matching value from the set.
+- `contains?` checks if a value is present in the set without querying ChromaDB.
+
+In addition, the by argument can be used for indexing hashmap values by one of their keys. Here's a brief example:
+
+```clojure
+(let [my-map-set (chroma-set [{:id 1 :sentence "hello world"}
+                              {:id 2 :sentence "open sesame"}
+                              {:id 3 :sentence "abracadabra"}]
+                             :by :sentence)]
+    (get my-map-set "hello")       ; => {:id 1 :sentence "hello world"}
+    (get my-map-set "open")        ; => {:id 2 :sentence "open sesame"}
+    (get my-map-set "abracadabra") ; => {:id 3 :sentence "abracadabra"}
+    (get my-map-set "abracadab")   ; => {:id 3 :sentence "abracadabra"}
+  ...)
+
+```
 
 ## Testing
 

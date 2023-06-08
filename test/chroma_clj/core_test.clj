@@ -4,12 +4,18 @@
             [chroma-clj.core :as    chroma :reload true]
             [libpython-clj2.python :as py]))
 
-(def ^:dynamic *test-coll*)
+(def ^:dynamic *test-map*)
+(def ^:dynamic *test-set*)
+(def ^:dynamic *test-set-by*)
 
 (defn fixture-chroma-map [f]
   (binding [chroma/*client* (chroma/client)]
     (chroma/reset)
-    (binding [*test-coll* (chroma/chroma-map {:cat :meow, :dog :bark, :bird :tweet})]
+    (binding [*test-map*    (chroma/chroma-map {:cat :meow, :dog :bark, :bird :tweet})
+              *test-set*    (chroma/chroma-set #{"cat" "dog" "bird"})
+              *test-set-by* (chroma/chroma-set [{:id 1 :sentence "hello world"}
+                                                {:id 2 :sentence "open sesame"}
+                                                {:id 3 :sentence "abracadabra"}])]
       (f))))
 
 (use-fixtures :each fixture-chroma-map)
@@ -78,28 +84,89 @@
      (is (= (-> (chroma/peek) :ids)
             ["uri9" "uri10"])))))
 
-(deftest test-lookup
+;; -- Fuzzy hashmap
+(deftest test-map-lookup
   (testing "Lookup values in the ChromaMap"
-    (is (= (get *test-coll* :cat) :meow))
-    (is (= (get *test-coll* :dog) :bark))
-    (is (= (get *test-coll* :bird) :tweet))))
+    (is (= (get *test-map* :cat) :meow))
+    (is (= (get *test-map* :dog) :bark))
+    (is (= (get *test-map* :bird) :tweet))))
 
-(deftest test-assoc
+(deftest test-map-assoc
   (testing "Assoc a value in the ChromaMap"
-    (let [new-coll (assoc *test-coll* :fish :splash)]
+    (let [new-coll (assoc *test-map* :fish :splash)]
       (is (= (get new-coll :fish) :splash)))))
 
-(deftest test-dissoc
+(deftest test-map-dissoc
   (testing "Dissoc a value in the ChromaMap"
-    (let [new-coll (dissoc *test-coll* :bird)]
+    (let [new-coll (dissoc *test-map* :bird)]
       (is (and (not= (get new-coll :bird) :tweet)
                (nil? (get (.m new-coll) :bird)))))))
 
-(deftest test-count
+(deftest test-map-count
   (testing "Count of entries in the ChromaMap"
-    (is (= (count *test-coll*) 3))))
+    (is (= (count *test-map*) 3))))
 
-(deftest test-similar-key
+(deftest test-map-similar-key
   (testing "Finding a similar key in the ChromaMap"
     ;; assuming the chroma-db returns ":cat" for "cat-like"
-    (is (= (get *test-coll* "cat-like") :meow))))
+    (is (= (get *test-map* "cat-like") :meow))))
+
+;; -- Fuzzy set
+(deftest test-set-contains
+  (testing "Check if a value is present in the ChromaSet"
+    (is      (contains? *test-set* "cat"))
+    (is      (contains? *test-set* "dog"))
+    (is      (contains? *test-set* "bird"))
+    (is (not (contains? *test-set* "wolf")))))
+
+(deftest test-set-disjoin
+  (testing "Remove a value from the ChromaSet"
+    (is (contains? *test-set* "cat"))
+    (let [new-set (disj *test-set* "cat")]
+      (is (not (contains? new-set "cat")))
+      (is      (contains? new-set "dog"))
+      (is      (contains? new-set "bird")))))
+
+(deftest test-set-conj
+  (testing "Add a value to the ChromaSet"
+    (is (contains? *test-set* "cat"))
+    (let [new-set (conj *test-set* "wolf")]
+      (is (contains? new-set "cat"))
+      (is (contains? new-set "dog"))
+      (is (contains? new-set "bird"))
+      (is (contains? new-set "wolf")))))
+
+(deftest test-set-empty
+  (testing "Empty the ChromaSet"
+    (is (contains? *test-set* "cat"))
+    (let [new-set (empty *test-set*)]
+      (is (not (contains? new-set "cat")))
+      (is (not (contains? new-set "dog")))
+      (is (not (contains? new-set "bird"))))))
+
+(deftest test-set-equiv
+  (testing "Check equivalence of ChromaSets"
+    (let [set1 (chroma/chroma-set #{"cat" "dog" "bird"})
+          set2 (chroma/chroma-set #{"bird" "dog" "cat"})]
+      (is (.equiv set1 set2)))))
+
+(deftest test-set-similar-key
+  (testing "Finding a similar key in the ChromaSet"
+    ;; assuming the chroma-db returns "cat" for "minitiger"
+    (is (not (contains? *test-set* "minitiger")))
+    (is (= (get *test-set* "minitiger")
+           "cat"))))
+
+(deftest test-set-by
+  (testing "Comparison by"
+    (is (not (contains?      *test-set-by* "hello world")))
+    (is (not (contains?      *test-set-by* "open sesame")))
+    (is (not (contains?      *test-set-by* "abracadabra")))
+    (is (not (contains?      *test-set-by* "abracadab")))
+
+    (is (= (get *test-set-by* "hello")       {:id 1 :sentence "hello world"}))
+    (is (= (get *test-set-by* "open")        {:id 2 :sentence "open sesame"}))
+    (is (= (get *test-set-by* "abracadabra") {:id 3 :sentence "abracadabra"}))
+    (is (= (get *test-set-by* "abracadab")   {:id 3 :sentence "abracadabra"}))))
+
+(run-tests)

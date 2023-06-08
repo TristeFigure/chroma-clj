@@ -220,13 +220,12 @@
 
   clojure.lang.IPersistentMap
   (assoc [_ k v]
-    ;; Add logic for creating a document with the key as name and content.
-    (let [id (name (gensym "chroma-map-key-"))]
+    (let [kid (name (gensym "chroma-map-key-"))]
       (add collection
            :documents (py/->python  [(str k)])
-           :metadatas (py/->py-list [{:id id}])
+           :metadatas (py/->py-list [{:id kid}])
            :ids       (py/->py-list [(str k)]))
-      (ChromaMap. id collection (assoc m k v) (assoc index id k))))
+      (ChromaMap. id collection (assoc m k v) (assoc index kid k))))
 
   (without [_ k]
     ;; Add logic for deleting the document with the same name as the key.
@@ -271,5 +270,64 @@
    Usage: (chroma-map m)
           (chroma-map id m)"
   ([m]    (chroma-map (gensym "chroma-map-") m))
-  ([id m] (-> (ChromaMap. id (create-collection (str (gensym))) {} {})
+  ([id m] (assert *client* "No chromadb client int *client*.")
+          (-> (ChromaMap. id (create-collection (str (gensym))) {} {})
               (merge m))))
+
+;;  --- Set with fuzzy key matching
+
+(deftype ChromaSet [id collection by s index]
+  ISimilarLookup
+  (similarKey [_ v]
+    (if (empty? s)
+      nil
+      (-> (query collection :query_texts (py/->py-list [(str (by v))]) :n_results 1)
+          :documents ffirst)))
+
+  clojure.lang.IPersistentSet
+  (disjoin [_ v]
+    (let [txt (str (by v))]
+      (delete collection :ids (py/->py-list [txt]))
+      (ChromaSet. id collection by
+                  (disj s v)
+                  (dissoc index txt))))
+
+  (contains [_ v]
+    (contains? s v))
+  
+  (get [this v]
+    (if (empty? s)
+      nil
+      (when-let [k (.similarKey this v)]
+        (c/get s (c/get index k)))))
+
+  clojure.lang.IPersistentCollection
+  (cons [_ v]
+    (let [txt   (str (by v))]
+      (add collection
+           :documents [txt]
+           :ids       [txt])
+      (ChromaSet. id collection by
+                  (conj s v)
+                  (assoc index txt v))))
+
+  (empty [_]
+    (ChromaSet. id (doto collection (delete)) by #{} {}))
+
+  (equiv [_ o]
+    (and (instance? ChromaSet o)
+         (= s (.-s ^ChromaSet o))))
+
+  clojure.lang.Seqable
+  (seq [_]
+    (seq s)))
+
+(defn chroma-set
+  "Creates a new ChromaSet instance with an optional 'id' and initial values from 's'.
+   Usage: (chroma-set s)
+          (chroma-set id s)"
+  ([s]       (chroma-set (gensym "chroma-set-") s))
+  ([id s]    (chroma-set id s identity))
+  ([id s by] (assert *client* "No chromadb client in var *client*.")
+             (-> (ChromaSet.  id  (create-collection (str (gensym)))  by  #{}  {})
+                 (into s))))
