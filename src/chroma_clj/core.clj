@@ -33,8 +33,8 @@
       (def Settings nil))
   (do (initialize!)
       (def ^:private chroma-db (import-module "chromadb"))
-      (from-import "chromadb"  ^:private Client)
-      (from-import "chromadb.config" ^:private Settings)))
+      (from-import "chromadb" Client)
+      (from-import "chromadb.config" Settings)))
 
 (defn client
   "Creates a new ChromaDB client instance.
@@ -42,8 +42,9 @@
   ([]     ($c Client))
   ([opts] (py. chroma-db Client (Settings opts))))
 
-(def ^:dynamic ^:private *client*
-  "The dynamic var holding the current ChromaDB client.")
+(def ^:dynamic *client*
+  "The dynamic var holding the current ChromaDB client."
+  nil)
 
 (defn set-client! [c]
   "Sets the root value of the *client*."
@@ -99,7 +100,8 @@
                       heartbeat])
 
 (def ^:dynamic *collection*
-  "The dynamic var holding the current ChromaDB collection.")
+  "The dynamic var holding the current ChromaDB collection."
+  nil)
 
 (defmacro on-collection
   "Binds the *collection* dynamic var to the specified collection 'collection'
@@ -153,7 +155,7 @@
        #(->> % (map py/->py-list) py/->py-list)
        py/->py-list))
 
-(defn empty->nil [x]
+(defn- empty->nil [x]
   (if (empty? x) nil x))
 
 (defn- adapt-args| [f]
