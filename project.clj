@@ -1,4 +1,4 @@
-(defproject chroma-clj "0.1.0"
+(defproject org.clojars.tristefigure/chroma-clj "0.1.0"
   :description "Clojure wrapper for ChromaDB"
   :url "https://github.com/TristeFigure/chroma-clj"
   :license {:name "Apache 2.0"

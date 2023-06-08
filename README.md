@@ -1,3 +1,5 @@
+[![Clojars Project](https://img.shields.io/clojars/v/org.clojars.tristefigure/chroma-clj.svg)](https://clojars.org/org.clojars.tristefigure/chroma-clj)
+
 # ChromaDB Clojure Bindings
 
 This project provides a Clojure interface to the [ChromaDB](https://docs.trychroma.com/) document database using [libpython-clj](https://github.com/clj-python/libpython-clj) as well as fuzzy map and set implementations relying on embeddings proximity.
@@ -8,7 +10,6 @@ This project provides a Clojure interface to the [ChromaDB](https://docs.trychro
 2. Clone this repository.
 3. Install the Python dependencies:
    - `pip install chromadb`
-4. Add this dependency to your project: `[chroma-clj "0.1.0"]`
 
 ## [API Doc](https://tristefigure.github.io/chroma-clj/index.html)
 
