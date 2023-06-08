@@ -27,62 +27,89 @@
 (deftest test-client-fns
   (testing "ChromaDB Collection Functions"
     (chroma/create-collection "testname")
-    (is (sequential?        (chroma/list-collections)))
-    (is (chroma-collection? (chroma/get-collection "testname")))
-    (is (chroma-collection? (chroma/get-or-create-collection "testname")))
-    (is (nil?               (chroma/delete-collection "testname")))
-    (is (number?            (chroma/heartbeat)))
-    (is (nil?               (chroma/reset)))))
+    (testing "list-collections"         (is (sequential?        (chroma/list-collections))))
+    (testing "get-collection"           (is (chroma-collection? (chroma/get-collection           "testname"))))
+    (testing "get-or-create-collection" (is (chroma-collection? (chroma/get-or-create-collection "testname"))))
+    (testing "delete-collection"        (is (nil?               (chroma/delete-collection        "testname"))))
+    (testing "heartbeat"                (is (number?            (chroma/heartbeat))))
+    (testing "reset"                    (is (nil?               (chroma/reset))))))
 
 (deftest test-collection-fns
   (testing "ChromaDB Collection Functions"
     (chroma/on-collection
-     (chroma/create-collection "testname")
+     (testing "create-collection" (chroma/create-collection "testname"))
 
-     (is (= (chroma/count) 0))
+     (testing "count"
+       (is (= (chroma/count) 0)))
 
-     (let [cnt (chroma/count)]
+     (testing "add"
+       (let [cnt (chroma/count)]
        ;; either one at a time
-       (chroma/add :ids "id1"
-                   :embeddings [1.5 2.9 3.4]
+         (chroma/add :ids        "id1"
+                     :embeddings [1.5 2.9 3.4]
                    ;; Have to wrap metadatas in a vector otherwise
                    ;; ValueError: Expected metadatas to be a list, got {"source" "my-source"}
                    ;; Chromadb/api/types.py error ?
-                   :metadatas [{"source" "my-source"}]
-                   :documents "This is a document")
-       (is (= (chroma/count) (inc cnt))))
+                     :metadatas [{"source" "my-source"}]
+                     :documents "This is a document")
+         (is (= (chroma/count) (inc cnt))))
 
-     (let [cnt (chroma/count)]
-       (chroma/add :ids ["uri9" "uri10"]
-                   :embeddings [[1.5 2.9 3.4] [9.8 2.3 2.9]]
-                   :metadatas [{"style" "style1"} {"style" "style2"}]
-                   :documents ["This is a document" "That is a document"])
-       (is (= (chroma/count) (+ 2 cnt))))
+       (let [cnt (chroma/count)]
+         (chroma/add :ids        ["uri9" "uri10"]
+                     :embeddings [[1.5 2.9 3.4] [9.8 2.3 2.9]]
+                     :metadatas  [{"style" "style1"} {"style" "style2"}]
+                     :documents  ["This is a document" "That is a document"])
+         (is (= (chroma/count) (+ 2 cnt)))))
 
-     (let [cnt (chroma/count)]
-       (chroma/upsert :ids ["id1"]
-                      :embeddings [[1.5 2.9 3.4]]
-                      :metadatas [{"source" "my-source"}]
-                      :documents ["This is a document"])
-       (is (= (chroma/count) cnt)))
+     (testing "upsert"
+       (let [cnt (chroma/count)]
+         (chroma/upsert :ids        ["id1"]
+                        :embeddings [[1.5 2.9 3.4]]
+                        :metadatas  [{"source" "my-source"}]
+                        :documents  ["This is a document"])
+         (is (= (chroma/count) cnt))))
 
-     (is (= (-> (chroma/get :where          {"style" "style2"}
-                            :where-document {"$contains" "That"}
-                            :limit          1
-                            :offset         0)
-                :ids first)
-            "uri10"))
+     (testing "update"
+       (let [cnt (chroma/count)]
+         (chroma/update :ids        ["id1"]
+                        :metadatas  [{"source" "other-source"}])
+         (is (= (chroma/count) cnt))
+         (is (= (-> (chroma/get :ids ["id1"]) :metadatas first (get "source"))
+                "other-source"))
+         (is (thrown? Exception (chroma/update :ids        ["unknownid"]
+                                               :metadatas  [{"source" "other-source"}])))))
 
-     (is (= (-> (chroma/query :query-embeddings [[1.1 2.3 3.2]]
-                              :n-results 1
-                              :where {"style" "style2"})
-                :ids first)
-            ["uri10"]))
+     (testing "get"
+       (is (= (-> (chroma/get :where          {"style" "style2"}
+                              :where-document {"$contains" "That"}
+                              :limit          1
+                              :offset         0)
+                  :ids first)
+              "uri10")))
 
-     (is (nil? (chroma/delete :ids ["id1"])))
+     (testing "query"
+       (is (= (-> (chroma/query :query-embeddings [[1.1 2.3 3.2]]
+                                :n-results        1
+                                :where            {"style" "style2"})
+                  :ids first)
+              ["uri10"])))
 
-     (is (= (-> (chroma/peek) :ids)
-            ["uri9" "uri10"])))))
+     (testing "delete"
+       (is (nil? (chroma/delete :ids ["id1"]))))
+
+     (testing "peek"
+       (is (= (-> (chroma/peek) :ids)
+              ["uri9" "uri10"])))
+
+
+     (testing "modify"
+       (is (= (py/py.- chroma/*collection* :name) "testname"))
+       (is (nil? (py/py.- chroma/*collection* :metadata)))
+
+       (chroma/modify chroma/*collection* :name "changedname" :metadata {:a 1})
+
+       (is (= (py/py.- chroma/*collection* :name) "changedname"))
+       (is (= (py/py.- chroma/*collection* :metadata) {:a 1}))))))
 
 ;; -- Fuzzy hashmap
 (deftest test-map-lookup
@@ -159,14 +186,12 @@
 
 (deftest test-set-by
   (testing "Comparison by"
-    (is (not (contains?      *test-set-by* "hello world")))
-    (is (not (contains?      *test-set-by* "open sesame")))
-    (is (not (contains?      *test-set-by* "abracadabra")))
-    (is (not (contains?      *test-set-by* "abracadab")))
+    (is (not (contains? *test-set-by* "hello world")))
+    (is (not (contains? *test-set-by* "open sesame")))
+    (is (not (contains? *test-set-by* "abracadabra")))
+    (is (not (contains? *test-set-by* "abracadab")))
 
     (is (= (get *test-set-by* "hello")       {:id 1 :sentence "hello world"}))
     (is (= (get *test-set-by* "open")        {:id 2 :sentence "open sesame"}))
     (is (= (get *test-set-by* "abracadabra") {:id 3 :sentence "abracadabra"}))
     (is (= (get *test-set-by* "abracadab")   {:id 3 :sentence "abracadabra"}))))
-
-(run-tests)

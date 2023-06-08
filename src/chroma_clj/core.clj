@@ -168,9 +168,8 @@
           {:documents        (when| vector? py/->python)
            :embeddings       adapt-embeddings|
            :query_embeddings adapt-embeddings|
-           :where            py/->py-dict
-           :where_document   py/->py-dict
-           ::default         (when| vector? py/->py-list)})
+           ::default         (->| (when| vector? py/->py-list)
+                                  (when| map?    py/->py-dict))})
 
          (apply f collection)
 
@@ -185,7 +184,7 @@
          py/->jvm
          keywordize-keys)))
 
-(gen-py-fns *collection* [modify
+(gen-py-fns *collection* [[modify adapt-args|]
                           count
                           [add    adapt-args|]
                           [update adapt-args|]
@@ -215,21 +214,20 @@
   (similarKey [_ k]
     (if (empty? m)
       nil
-      (-> (query collection :query_texts (py/->py-list [(str k)]) :n_results 1)
+      (-> (query collection :query_texts [(str k)] :n_results 1)
           :metadatas ffirst :id (->> (c/get index)))))
 
   clojure.lang.IPersistentMap
   (assoc [_ k v]
     (let [kid (name (gensym "chroma-map-key-"))]
       (add collection
-           :documents (py/->python  [(str k)])
-           :metadatas (py/->py-list [{:id kid}])
-           :ids       (py/->py-list [(str k)]))
+           :documents [(str k)]
+           :metadatas [{:id kid}]
+           :ids       [(str k)])
       (ChromaMap. id collection (assoc m k v) (assoc index kid k))))
 
   (without [_ k]
-    ;; Add logic for deleting the document with the same name as the key.
-    (delete collection :ids (py/->py-list [(str k)]))
+    (delete collection :ids [(str k)])
     (ChromaMap. id collection
                 (dissoc m k)
                 (dissoc index (c/get (set/map-invert index) k))))
@@ -242,7 +240,6 @@
 
   clojure.lang.ILookup
   (valAt [this k not-found]
-    ;; Add logic for querying chromadb with the key and get the first matching document.
     (or (.valAt m k)
         (if-let [found-k (.similarKey this k)]
           (c/get m found-k not-found)
@@ -281,13 +278,13 @@
   (similarKey [_ v]
     (if (empty? s)
       nil
-      (-> (query collection :query_texts (py/->py-list [(str (by v))]) :n_results 1)
+      (-> (query collection :query_texts [(str (by v))] :n_results 1)
           :documents ffirst)))
 
   clojure.lang.IPersistentSet
   (disjoin [_ v]
     (let [txt (str (by v))]
-      (delete collection :ids (py/->py-list [txt]))
+      (delete collection :ids [txt])
       (ChromaSet. id collection by
                   (disj s v)
                   (dissoc index txt))))

@@ -71,26 +71,34 @@ Once you have a collection, in the same manner, relying on the collection in the
 ```clojure
 (on-collection my-collection
   (count)
-  (add {:ids "id1"
-        :embeddings [1.5 2.9 3.4]
-        :metadatas {"source" "my-source"}
-        :documents "This is a document"})
-  (add {:ids ["uri9" "uri10"]
-        :embeddings [[1.5 2.9 3.4] [9.8 2.3 2.9]]
-        :metadatas [{"style" "style1"} {"style" "style2"}]
-        :documents ["This is a document" "That is a document"]})
-  (upsert {:ids "id1"
+  (add    {:ids "id1"
            :embeddings [1.5 2.9 3.4]
-           :metadatas {"source" "my-source"}
-           :documents "This is a document"}))
+           :metadatas  [{"source" "my-source"}]
+           :documents  "This is a document"})
+  (add    {:ids        ["uri9" "uri10"]
+           :embeddings [[1.5 2.9 3.4] [9.8 2.3 2.9]]
+           :metadatas  [{"style" "style1"} {"style" "style2"}]
+           :documents  ["This is a document" "That is a document"]})
+  (upsert {:ids        ["id1"]
+           :embeddings [[1.5 2.9 3.4]]
+           :metadatas  [{"source" "my-source"}]
+           :documents  ["This is a document"]})
+  (update {:ids        ["id1"]
+           :metadatas  [{"source" "other-source"}]}
+  ;; To modify the collection attributes instead of its content:
+  (modify {:ids        ["id1"]
+           :name       "other-testname"
+           :metadata    {:some :data}})))
 
 ;; Or alternatively
-(get my-collection)
-(query my-collection
-       {:query-embeddings [[1.1 2.3 3.2] [5.1 4.3 2.2]]
-        :n-results 2
-        :where {"style" "style2"}})
-(delete my-collection :ids ["id1"])
+(get    my-collection :where            {"style" "style2"}
+                      :where-document   {"$contains" "That"}
+                      :limit            1
+                      :offset           0)
+(query  my-collection :query-embeddings [[1.1 2.3 3.2] [5.1 4.3 2.2]]
+                      :n-results        2
+                      :where            {"style" "style2"}})
+(delete my-collection :ids              ["id1"])
 
 ;; Convenience. Get first 5 items.
 (peek my-collection)
